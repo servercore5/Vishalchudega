@@ -9,7 +9,6 @@
 
 <hr>
 
-<!-- 🎤 MIC ENABLE -->
 <button id="enableMicBtn">Enable Microphone 🎤</button>
 <p id="micStatus"></p>
 
@@ -22,7 +21,6 @@
 <p id="result"></p>
 <button id="startChatBtn" style="display:none;">Start Chat</button>
 
-<!-- 🔥 CALL BUTTONS -->
 <button id="callBtn" style="display:none;">Call 📞</button>
 <button id="answerBtn" style="display:none;">Answer 📞</button>
 
@@ -50,43 +48,32 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 🔥 current user
 const currentUser = localStorage.getItem("username");
 document.getElementById("userDisplay").innerText = currentUser;
 
 let selectedUser = "";
 let chatId = "";
 let micAllowed = false;
+let unsubscribe = null;
 
-// 🎤 MIC BUTTON
+// 🎤 MIC
 document.getElementById("enableMicBtn").addEventListener("click", async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
     micAllowed = true;
     document.getElementById("micStatus").innerText = "Microphone Allowed ✅";
-
-    stream.getTracks().forEach(track => track.stop());
-
-  } catch (err) {
+    stream.getTracks().forEach(t => t.stop());
+  } catch {
     document.getElementById("micStatus").innerText = "Mic Denied ❌";
   }
 });
 
-// 🔥 CALL VARIABLES
-let pc = new RTCPeerConnection({
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-});
-let localStream;
-
 // 🔍 SEARCH
 document.getElementById("searchBtn").addEventListener("click", async () => {
   const username = document.getElementById("searchInput").value;
+  const snap = await getDoc(doc(db, "users", username));
 
-  const userRef = doc(db, "users", username);
-  const userSnap = await getDoc(userRef);
-
-  if (userSnap.exists()) {
+  if (snap.exists()) {
     document.getElementById("result").innerText = "User Found ✅";
     document.getElementById("startChatBtn").style.display = "block";
     document.getElementById("callBtn").style.display = "block";
@@ -96,14 +83,13 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   }
 });
 
-// 💬 START CHAT
+// 💬 CHAT
 document.getElementById("startChatBtn").addEventListener("click", () => {
   document.getElementById("chatBox").style.display = "block";
   chatId = [currentUser, selectedUser].sort().join("_");
   loadMessages();
 });
 
-// 📤 SEND
 document.getElementById("sendBtn").addEventListener("click", async () => {
   const msg = document.getElementById("msgInput").value;
   if (!msg) return;
@@ -117,57 +103,67 @@ document.getElementById("sendBtn").addEventListener("click", async () => {
   document.getElementById("msgInput").value = "";
 });
 
-// 📥 REALTIME
 function loadMessages() {
+  if (unsubscribe) unsubscribe();
+
   const q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("time")
   );
 
-  onSnapshot(q, (snapshot) => {
+  unsubscribe = onSnapshot(q, (snap) => {
     const box = document.getElementById("messages");
     box.innerHTML = "";
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      box.innerHTML += `<p><b>${data.sender}:</b> ${data.text}</p>`;
+    snap.forEach(doc => {
+      const d = doc.data();
+      box.innerHTML += `<p><b>${d.sender}:</b> ${d.text}</p>`;
     });
 
     box.scrollTop = box.scrollHeight;
   });
 }
 
-// 📞 CALL START
-document.getElementById("callBtn").addEventListener("click", async () => {
-  try {
+// =====================
+// 📞 CALL SYSTEM
+// =====================
 
-    if (!micAllowed) {
-      alert("Pehle mic allow kar bhai 🎤");
-      return;
-    }
+let pc = new RTCPeerConnection({
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+});
+let localStream;
 
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
+// ICE FIX
+pc.onicecandidate = async (event) => {
+  if (event.candidate) {
     await setDoc(doc(db, "calls", selectedUser), {
-      offer: offer,
+      candidate: JSON.stringify(event.candidate),
       from: currentUser
-    });
-
-    alert("Calling... 📞");
-
-  } catch (err) {
-    alert(err.message);
+    }, { merge: true });
   }
+};
+
+// CALL START
+document.getElementById("callBtn").addEventListener("click", async () => {
+  if (!micAllowed) return alert("Pehle mic allow kar 🎤");
+
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  await setDoc(doc(db, "calls", selectedUser), {
+    offer,
+    from: currentUser
+  });
+
+  alert("Calling... 📞");
 });
 
-// 📞 RECEIVE CALL
-onSnapshot(doc(db, "calls", currentUser), async (snapshot) => {
-  const data = snapshot.data();
+// RECEIVE
+onSnapshot(doc(db, "calls", currentUser), async (snap) => {
+  const data = snap.data();
 
   if (data?.offer) {
     document.getElementById("answerBtn").style.display = "block";
@@ -177,28 +173,26 @@ onSnapshot(doc(db, "calls", currentUser), async (snapshot) => {
   if (data?.answer) {
     await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
   }
+
+  if (data?.candidate) {
+    const c = new RTCIceCandidate(JSON.parse(data.candidate));
+    await pc.addIceCandidate(c);
+  }
 });
 
-// 📞 ANSWER
+// ANSWER
 document.getElementById("answerBtn").addEventListener("click", async () => {
-  try {
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
 
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  await updateDoc(doc(db, "calls", selectedUser), {
+    answer
+  });
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    await updateDoc(doc(db, "calls", currentUser), {
-      answer: answer
-    });
-
-    alert("Call Connected 🎤");
-
-  } catch (err) {
-    alert(err.message);
-  }
+  alert("Call Connected 🎤");
 });
 
 </script>
