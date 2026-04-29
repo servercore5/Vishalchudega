@@ -7,6 +7,7 @@
 
 <h2>Login / Signup</h2>
 
+<input id="username" placeholder="Username"><br><br>
 <input id="email" placeholder="Email"><br><br>
 <input id="password" type="password" placeholder="Password"><br><br>
 
@@ -15,12 +16,16 @@
 
 <script type="module">
 
-// 🔥 Firebase imports (IMPORTANT)
+// 🔥 Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 TERA CONFIG (same as you gave)
+// 🔥 Firestore imports (NEW)
+import { getFirestore, setDoc, doc } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// 🔥 Firebase config (same)
 const firebaseConfig = {
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
@@ -34,18 +39,35 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app); // 🔥 NEW
 
-// ✅ SIGNUP
+// ✅ SIGNUP (UPDATED)
 document.getElementById("signupBtn").addEventListener("click", async () => {
   try {
-    await createUserWithEmailAndPassword(auth, email.value, password.value);
-    alert("Signup success ✅");
+    const username = document.getElementById("username").value;
+
+    if (!username) {
+      alert("Username daal bhai 😄");
+      return;
+    }
+
+    const userCred = await createUserWithEmailAndPassword(auth, email.value, password.value);
+
+    // 🔥 Firestore में save
+    await setDoc(doc(db, "users", username), {
+      email: email.value,
+      uid: userCred.user.uid,
+      online: true
+    });
+
+    alert("Signup + Firestore save ✅");
+
   } catch (err) {
     alert(err.message);
   }
 });
 
-// ✅ LOGIN
+// ✅ LOGIN (same)
 document.getElementById("loginBtn").addEventListener("click", async () => {
   try {
     await signInWithEmailAndPassword(auth, email.value, password.value);
