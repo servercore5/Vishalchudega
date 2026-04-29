@@ -7,27 +7,43 @@
   <style>
     body {
       margin: 0;
-      font-family: Arial;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       background: #0b141a;
       color: white;
     }
 
     header {
       padding: 15px;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
+      background: #202c33;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: space-around;
+      padding: 10px;
+      background: #202c33;
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .active {
+      color: #25D366;
+      border-bottom: 2px solid #25D366;
     }
 
     #searchBox {
       padding: 10px;
+      background: #202c33;
     }
 
     input {
-      width: 95%;
+      width: 100%;
       padding: 10px;
       border-radius: 10px;
       border: none;
-      background: #202c33;
+      background: #2a3942;
       color: white;
     }
 
@@ -35,49 +51,92 @@
       display: flex;
       padding: 12px;
       border-bottom: 1px solid #222;
+      align-items: center;
       cursor: pointer;
     }
 
+    .chatItem:hover {
+      background: #202c33;
+    }
+
     .avatar {
-      width: 45px;
-      height: 45px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       background: #555;
       margin-right: 10px;
+      position: relative;
     }
 
-    .chatName {
+    .online {
+      width: 10px;
+      height: 10px;
+      background: #25D366;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 3px;
+      right: 3px;
+    }
+
+    .chatContent {
+      flex: 1;
+    }
+
+    .name {
       font-weight: bold;
     }
 
+    .msg {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .right {
+      text-align: right;
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .badge {
+      background: #25D366;
+      color: black;
+      padding: 3px 6px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-top: 3px;
+      display: inline-block;
+    }
+
+    /* CHAT SCREEN */
     #chatScreen {
       display: none;
       position: fixed;
       top: 0;
-      left: 0;
       width: 100%;
       height: 100%;
       background: #0b141a;
     }
 
     #chatHeader {
-      padding: 15px;
       background: #202c33;
+      padding: 12px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
 
     #messages {
-      height: 65%;
+      height: 70%;
       overflow-y: auto;
       padding: 10px;
     }
 
     .bubble {
       max-width: 70%;
-      padding: 8px;
-      margin: 5px;
+      padding: 8px 12px;
       border-radius: 10px;
+      margin: 5px 0;
+      font-size: 14px;
     }
 
     .me {
@@ -113,24 +172,31 @@
       padding: 10px;
       border: none;
       border-radius: 10px;
-      background: #00a884;
-      color: white;
+      background: #25D366;
+      color: black;
     }
   </style>
 </head>
 
 <body>
 
-<header>Chats</header>
+<header>WhatsApp</header>
+
+<div class="tabs">
+  <div class="active">Chats</div>
+  <div>Status</div>
+  <div>Calls</div>
+</div>
 
 <div id="searchBox">
-  <input id="searchInput" placeholder="Search username">
+  <input id="searchInput" placeholder="Search">
 </div>
 
 <div id="chatList"></div>
 
-<!-- CHAT -->
+<!-- CHAT SCREEN -->
 <div id="chatScreen">
+
   <div id="chatHeader">
     <span id="chatName"></span>
     <button onclick="closeChat()">❌</button>
@@ -139,9 +205,10 @@
   <div id="messages"></div>
 
   <div id="inputArea">
-    <input id="msgInput" placeholder="Type message">
-    <button id="sendBtn">Send</button>
+    <input id="msgInput" placeholder="Type a message">
+    <button id="sendBtn">➤</button>
   </div>
+
 </div>
 
 <script type="module">
@@ -160,14 +227,13 @@ const app = initializeApp({
 
 const db = getFirestore(app);
 
-// ✅ IMPORTANT FIX
 const currentUser = localStorage.getItem("username")?.toLowerCase();
 
 let selectedUser = "";
 let chatId = "";
-let unsub = null;
+let unsub;
 
-// 🔍 SEARCH USER
+// 🔍 SEARCH
 searchInput.oninput = async () => {
   let val = searchInput.value.toLowerCase();
 
@@ -183,12 +249,16 @@ searchInput.oninput = async () => {
   if (snap.exists()) {
     chatList.innerHTML = `
       <div class="chatItem" onclick="openChat('${val}')">
-        <div class="avatar"></div>
-        <div class="chatName">${val}</div>
+        <div class="avatar"><div class="online"></div></div>
+        <div class="chatContent">
+          <div class="name">${val}</div>
+          <div class="msg">Tap to chat</div>
+        </div>
+        <div class="right">
+          now<br><span class="badge">1</span>
+        </div>
       </div>
     `;
-  } else {
-    chatList.innerHTML = "User not found ❌";
   }
 };
 
@@ -196,27 +266,23 @@ searchInput.oninput = async () => {
 window.openChat = (user) => {
 
   selectedUser = user.toLowerCase();
-
-  // 🔥 FIXED CHAT ID (same for both users)
   chatId = [currentUser, selectedUser].sort().join("_");
 
-  console.log("CHAT ID:", chatId);
-
   chatScreen.style.display = "block";
-  chatName.innerText = selectedUser;
+  chatName.innerText = user;
 
   loadMessages();
 };
 
-// ❌ CLOSE CHAT
+// ❌ CLOSE
 window.closeChat = () => {
   chatScreen.style.display = "none";
   if (unsub) unsub();
 };
 
-// 📤 SEND MESSAGE
+// 📤 SEND
 sendBtn.onclick = async () => {
-  const msg = msgInput.value.trim();
+  let msg = msgInput.value;
   if (!msg) return;
 
   await addDoc(collection(db, "chats", chatId, "messages"), {
@@ -228,23 +294,21 @@ sendBtn.onclick = async () => {
   msgInput.value = "";
 };
 
-// 📥 REALTIME RECEIVE
+// 📥 REALTIME
 function loadMessages() {
 
   if (unsub) unsub();
 
-  const q = query(
+  let q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("time")
   );
 
-  unsub = onSnapshot(q, (snap) => {
-    console.log("Messages:", snap.size);
-
+  unsub = onSnapshot(q, snap => {
     messages.innerHTML = "";
 
-    snap.forEach(doc => {
-      const m = doc.data();
+    snap.forEach(d => {
+      let m = d.data();
 
       messages.innerHTML += `
         <div class="bubble ${m.sender === currentUser ? 'me' : 'other'}">
