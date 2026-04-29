@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard</title>
+</head>
+<body>
+
+<h2>Welcome, <span id="userDisplay"></span> 👋</h2>
+
+<hr>
+
+<h3>Search User</h3>
+<input id="searchInput" placeholder="Enter username"><br><br>
+<button id="searchBtn">Search</button>
+
+<p id="result"></p>
+<button id="startChatBtn" style="display:none;">Start Chat</button>
+
+<div id="chatBox" style="display:none; margin-top:20px;">
+  <h3>Chat</h3>
+  <div id="messages" style="border:1px solid black; height:200px; overflow:auto;"></div><br>
+  <input id="msgInput" placeholder="Type message">
+  <button id="sendBtn">Send</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
+  authDomain: "vishalchudega.firebaseapp.com",
+  projectId: "vishalchudega",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 🔥 current user
+const currentUser = localStorage.getItem("username");
+document.getElementById("userDisplay").innerText = currentUser;
+
+let selectedUser = "";
+let chatId = "";
+
+// 🔍 SEARCH
+document.getElementById("searchBtn").addEventListener("click", async () => {
+  const username = document.getElementById("searchInput").value;
+
+  const userRef = doc(db, "users", username);
+  const userSnap = await getDoc(userRef);
+
+  if (userSnap.exists()) {
+    document.getElementById("result").innerText = "User Found ✅";
+    document.getElementById("startChatBtn").style.display = "block";
+    selectedUser = username;
+  } else {
+    document.getElementById("result").innerText = "User Not Found ❌";
+  }
+});
+
+// 💬 START CHAT
+document.getElementById("startChatBtn").addEventListener("click", () => {
+  document.getElementById("chatBox").style.display = "block";
+
+  chatId = [currentUser, selectedUser].sort().join("_");
+
+  loadMessages();
+});
+
+// 📤 SEND
+document.getElementById("sendBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("msgInput").value;
+
+  if (!msg) return;
+
+  await addDoc(collection(db, "chats", chatId, "messages"), {
+    text: msg,
+    sender: currentUser,
+    time: Date.now()
+  });
+
+  document.getElementById("msgInput").value = "";
+});
+
+// 📥 REALTIME
+function loadMessages() {
+  const q = query(
+    collection(db, "chats", chatId, "messages"),
+    orderBy("time")
+  );
+
+  onSnapshot(q, (snapshot) => {
+    const box = document.getElementById("messages");
+    box.innerHTML = "";
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      box.innerHTML += `<p><b>${data.sender}:</b> ${data.text}</p>`;
+    });
+
+    box.scrollTop = box.scrollHeight;
+  });
+}
+
+</script>
+
+</body>
+</html>
