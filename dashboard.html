@@ -1,20 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chats</title>
+  <title>Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body style="background:#0b141a; color:white; font-family:sans-serif;">
+<body style="background:#d6ecff;font-family:sans-serif;">
 
 <h2 style="padding:15px;">Chats</h2>
+
+<input id="searchInput" placeholder="Search username"
+style="width:90%;padding:10px;margin:10px;border-radius:8px;border:none;"><br>
+
+<button id="searchBtn" style="margin:10px;">Search</button>
 
 <div id="chatList"></div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs } 
+import { getFirestore, collection, getDocs, doc, getDoc, onSnapshot } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -28,32 +33,81 @@ const db = getFirestore(app);
 
 const currentUser = localStorage.getItem("username");
 
-async function loadUsers() {
-  const querySnapshot = await getDocs(collection(db, "users"));
+async function loadChats() {
 
-  const list = document.getElementById("chatList");
-  list.innerHTML = "";
+  const usersSnap = await getDocs(collection(db,"users"));
+  const box = document.getElementById("chatList");
+  box.innerHTML="";
 
-  querySnapshot.forEach(doc => {
-    const username = doc.id;
+  usersSnap.forEach(async d=>{
+    const user = d.id;
+    if(user === currentUser) return;
 
-    if (username === currentUser) return;
+    const chatId = [currentUser,user].sort().join("_");
 
-    list.innerHTML += `
-      <div onclick="openChat('${username}')" 
-      style="padding:15px;border-bottom:1px solid #222;cursor:pointer;">
-        ${username}
-      </div>
-    `;
+    const chatRef = doc(db,"chats",chatId);
+    const chatSnap = await getDoc(chatRef);
+
+    // 👉 only show if chat exists
+    if(chatSnap.exists()){
+
+      const data = d.data();
+
+      box.innerHTML += `
+        <div onclick="openChat('${user}')"
+        style="background:white;padding:12px;margin:8px;border-radius:10px;display:flex;align-items:center;">
+
+          <div style="width:45px;height:45px;border-radius:50%;background:#25D366;color:white;
+          display:flex;align-items:center;justify-content:center;font-weight:bold;">
+            ${user.charAt(0).toUpperCase()}
+          </div>
+
+          <div style="margin-left:10px;">
+            <div style="font-weight:bold;">${user}</div>
+            <div id="status_${user}" style="font-size:12px;color:gray;">offline</div>
+          </div>
+
+          <div id="dot_${user}" 
+          style="margin-left:auto;width:10px;height:10px;border-radius:50%;background:gray;"></div>
+
+        </div>
+      `;
+
+      // 🔴 ONLINE STATUS LISTENER
+      onSnapshot(doc(db,"users",user),(snap)=>{
+        const online = snap.data()?.online;
+
+        document.getElementById("dot_"+user).style.background =
+          online ? "#25D366" : "gray";
+
+        document.getElementById("status_"+user).innerText =
+          online ? "online" : "offline";
+      });
+
+    }
+
   });
 }
 
+document.getElementById("searchBtn").addEventListener("click",async ()=>{
+  const username = document.getElementById("searchInput").value;
+
+  const userRef = doc(db,"users",username);
+  const snap = await getDoc(userRef);
+
+  if(snap.exists()){
+    openChat(username);
+  }else{
+    alert("User not found ❌");
+  }
+});
+
 window.openChat = function(user){
-  localStorage.setItem("chatUser", user);
-  window.location.href = "chat.html";
+  localStorage.setItem("chatUser",user);
+  window.location.href="chat.html";
 }
 
-loadUsers();
+loadChats();
 
 </script>
 
