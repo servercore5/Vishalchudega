@@ -11,7 +11,6 @@
 <div style="display:flex;align-items:center;padding:10px;background:white;">
   <button onclick="goBack()">⬅</button>
   <h3 id="userName" style="margin-left:10px;"></h3>
-
   <button id="callBtn" style="margin-left:auto;">📞</button>
 </div>
 
@@ -22,7 +21,6 @@
 <div style="display:flex;padding:10px;background:white;">
   <input id="msgInput" placeholder="Type message"
   style="flex:0.8;padding:10px;border-radius:10px;border:1px solid gray;">
-  
   <button id="sendBtn" style="margin-left:5px;">Send</button>
 </div>
 
@@ -50,7 +48,9 @@ document.getElementById("userName").innerText = selectedUser;
 
 const chatId = [currentUser,selectedUser].sort().join("_");
 
-// SEND MESSAGE
+// ================== MESSAGE ==================
+
+// SEND
 document.getElementById("sendBtn").addEventListener("click", async ()=>{
   const msg = document.getElementById("msgInput").value;
   if(!msg) return;
@@ -75,19 +75,30 @@ onSnapshot(q,(snap)=>{
   snap.forEach(d=>{
     const data = d.data();
 
-    let ticks = "✔";
-
-    if(data.status==="delivered") ticks="✔✔";
-    if(data.status==="read") ticks="✔✔ (blue)";
+    let tick = "✔";
+    if(data.status==="delivered") tick="✔✔";
+    if(data.status==="read") tick="✔✔";
 
     box.innerHTML += `
-      <div style="text-align:${data.sender===currentUser?"right":"left"};margin:5px;">
-        <span style="background:${data.sender===currentUser?"#25D366":"white"};
-        color:${data.sender===currentUser?"white":"black"};
-        padding:10px;border-radius:10px;">
-          ${data.text}<br>
-          <small>${ticks}</small>
-        </span>
+      <div style="display:flex;flex-direction:column;
+      align-items:${data.sender===currentUser?"flex-end":"flex-start"};
+      margin:8px;">
+
+        <div style="
+          background:${data.sender===currentUser?"#25D366":"white"};
+          color:${data.sender===currentUser?"white":"black"};
+          padding:10px;
+          border-radius:12px;
+          max-width:70%;
+          word-wrap:break-word;
+        ">
+          ${data.text}
+        </div>
+
+        <div style="font-size:11px;color:gray;margin-top:2px;">
+          ${tick}
+        </div>
+
       </div>
     `;
   });
@@ -95,14 +106,31 @@ onSnapshot(q,(snap)=>{
   box.scrollTop = box.scrollHeight;
 });
 
-// 📞 CALL (BASIC FIXED)
+// ================== CALL SYSTEM ==================
+
 let pc = new RTCPeerConnection({
   iceServers:[{urls:"stun:stun.l.google.com:19302"}]
 });
 
-document.getElementById("callBtn").addEventListener("click",async ()=>{
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+let localStream;
+
+// CALL START
+document.getElementById("callBtn").addEventListener("click", async ()=>{
+
+  localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+
+  localStream.getTracks().forEach(track=>{
+    pc.addTrack(track,localStream);
+  });
+
+  // ICE SEND
+  pc.onicecandidate = async (event)=>{
+    if(event.candidate){
+      await setDoc(doc(db,"calls",selectedUser+"_ice"),{
+        candidate:event.candidate
+      });
+    }
+  };
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -115,14 +143,18 @@ document.getElementById("callBtn").addEventListener("click",async ()=>{
   alert("Calling...");
 });
 
-onSnapshot(doc(db,"calls",currentUser),async (snap)=>{
+// RECEIVE
+onSnapshot(doc(db,"calls",currentUser), async (snap)=>{
   const data = snap.data();
 
   if(data?.offer){
+
     await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
 
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+    localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    localStream.getTracks().forEach(track=>{
+      pc.addTrack(track,localStream);
+    });
 
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
@@ -131,13 +163,15 @@ onSnapshot(doc(db,"calls",currentUser),async (snap)=>{
       answer:answer
     });
 
-    alert("Call Connected 🎤");
+    alert("Incoming call 🎤 Connected");
   }
 
   if(data?.answer){
     await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
   }
 });
+
+// ==================
 
 window.goBack=()=>window.location.href="dashboard.html";
 
