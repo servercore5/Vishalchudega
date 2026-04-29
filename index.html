@@ -10,22 +10,17 @@
 <input id="email" placeholder="Email"><br><br>
 <input id="password" type="password" placeholder="Password"><br><br>
 
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
+<button id="signupBtn">Sign Up</button>
+<button id="loginBtn">Login</button>
 
 <script type="module">
 
+// 🔥 Firebase imports (IMPORTANT)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// 🔥 TERA CONFIG YAHA DAAL
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
+// 🔥 TERA CONFIG (same as you gave)
 const firebaseConfig = {
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
@@ -38,22 +33,27 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-};
-
-const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// SIGNUP
-window.signup = async function() {
-  await createUserWithEmailAndPassword(auth, email.value, password.value);
-  alert("Signup success");
-}
+// ✅ SIGNUP
+document.getElementById("signupBtn").addEventListener("click", async () => {
+  try {
+    await createUserWithEmailAndPassword(auth, email.value, password.value);
+    alert("Signup success ✅");
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
-// LOGIN
-window.login = async function() {
-  await signInWithEmailAndPassword(auth, email.value, password.value);
-  alert("Login success");
-}
+// ✅ LOGIN
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  try {
+    await signInWithEmailAndPassword(auth, email.value, password.value);
+    alert("Login success ✅");
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 </script>
 
