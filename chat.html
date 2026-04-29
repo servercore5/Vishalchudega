@@ -3,177 +3,270 @@
 <head>
   <title>Chat</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body{
+      margin:0;
+      font-family:sans-serif;
+      background:#cfe3f3;
+    }
+
+    /* HEADER */
+    .header{
+      background:white;
+      padding:12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      font-weight:bold;
+    }
+
+    .chatBox{
+      height:75vh;
+      overflow:auto;
+      padding:10px;
+    }
+
+    .msg{
+      max-width:70%;
+      padding:10px;
+      margin:6px;
+      border-radius:10px;
+      position:relative;
+      word-wrap:break-word;
+    }
+
+    .sent{
+      background:#25D366;
+      color:white;
+      margin-left:auto;
+    }
+
+    .received{
+      background:white;
+      margin-right:auto;
+    }
+
+    .time{
+      font-size:10px;
+      display:block;
+      margin-top:5px;
+      text-align:right;
+    }
+
+    .inputBox{
+      position:fixed;
+      bottom:0;
+      width:100%;
+      display:flex;
+      background:white;
+      padding:10px;
+    }
+
+    .inputBox input{
+      flex:1;
+      padding:10px;
+      border-radius:20px;
+      border:1px solid gray;
+    }
+
+    .inputBox button{
+      margin-left:10px;
+      padding:10px 15px;
+      background:#25D366;
+      color:white;
+      border:none;
+      border-radius:20px;
+    }
+
+    /* 📞 CALL SCREEN */
+    #callScreen{
+      display:none;
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background:black;
+      color:white;
+      z-index:9999;
+      text-align:center;
+    }
+
+    #callScreen h2{
+      margin-top:40px;
+    }
+
+    .callControls{
+      position:absolute;
+      bottom:40px;
+      width:100%;
+      display:flex;
+      justify-content:space-evenly;
+    }
+
+    .callControls button{
+      padding:15px;
+      border-radius:50%;
+      border:none;
+      font-size:18px;
+    }
+
+    .end{
+      background:red;
+      color:white;
+    }
+
+  </style>
 </head>
 
-<body style="background:#d6ecff;font-family:sans-serif;">
+<body>
 
 <!-- HEADER -->
-<div style="display:flex;align-items:center;padding:10px;background:white;">
+<div class="header">
   <button onclick="goBack()">⬅</button>
-  <h3 id="userName" style="margin-left:10px;"></h3>
-  <button id="callBtn" style="margin-left:auto;">📞</button>
+  <span id="chatUser"></span>
+  <button id="callBtn">📞</button>
 </div>
 
-<!-- MESSAGES -->
-<div id="messages" style="height:65vh;overflow:auto;padding:10px;"></div>
+<!-- CHAT -->
+<div id="messages" class="chatBox"></div>
 
 <!-- INPUT -->
-<div style="display:flex;padding:10px;background:white;">
-  <input id="msgInput" placeholder="Type message"
-  style="flex:0.8;padding:10px;border-radius:10px;border:1px solid gray;">
-  <button id="sendBtn" style="margin-left:5px;">Send</button>
+<div class="inputBox">
+  <input id="msgInput" placeholder="Type message">
+  <button id="sendBtn">Send</button>
+</div>
+
+<!-- 📞 CALL UI -->
+<div id="callScreen">
+  <button onclick="goToChat()" style="position:absolute;top:10px;left:10px;background:none;color:white;border:none;">
+    ⬅ Go to Chats
+  </button>
+
+  <h2 id="callUserName"></h2>
+  <p id="callStatus">Calling...</p>
+
+  <div style="width:150px;height:150px;border-radius:50%;background:#444;margin:40px auto;display:flex;align-items:center;justify-content:center;font-size:40px;">
+    👤
+  </div>
+
+  <div class="callControls">
+    <button>⋯</button>
+    <button>📹</button>
+    <button>🔊</button>
+    <button>🎤</button>
+    <button class="end" onclick="endCall()">📞</button>
+  </div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, onSnapshot, query, orderBy,
-  doc, setDoc, updateDoc
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
-  projectId: "vishalchudega",
+  projectId: "vishalchudega"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// USERS
 const currentUser = localStorage.getItem("username");
-const selectedUser = localStorage.getItem("chatUser");
+const selectedUser = new URLSearchParams(window.location.search).get("user");
 
-document.getElementById("userName").innerText = selectedUser;
+document.getElementById("chatUser").innerText = selectedUser;
 
-const chatId = [currentUser,selectedUser].sort().join("_");
+const chatId = [currentUser, selectedUser].sort().join("_");
 
-// ================== MESSAGE ==================
+// 📩 LOAD MESSAGES
+const q = query(collection(db,"chats",chatId,"messages"), orderBy("time"));
 
-// SEND
-document.getElementById("sendBtn").addEventListener("click", async ()=>{
+onSnapshot(q, snapshot => {
+  const box = document.getElementById("messages");
+  box.innerHTML = "";
+
+  snapshot.forEach(doc=>{
+    const data = doc.data();
+
+    const div = document.createElement("div");
+    div.className = "msg " + (data.sender === currentUser ? "sent":"received");
+
+    div.innerHTML = `
+      ${data.text}
+      <span class="time">${new Date(data.time).toLocaleTimeString()}</span>
+    `;
+
+    box.appendChild(div);
+  });
+
+  box.scrollTop = box.scrollHeight;
+});
+
+// 📤 SEND
+document.getElementById("sendBtn").onclick = async ()=>{
   const msg = document.getElementById("msgInput").value;
   if(!msg) return;
 
   await addDoc(collection(db,"chats",chatId,"messages"),{
     text:msg,
     sender:currentUser,
-    status:"sent",
     time:Date.now()
   });
 
   document.getElementById("msgInput").value="";
-});
+};
 
-// REALTIME
-const q = query(collection(db,"chats",chatId,"messages"),orderBy("time"));
-
-onSnapshot(q,(snap)=>{
-  const box = document.getElementById("messages");
-  box.innerHTML="";
-
-  snap.forEach(d=>{
-    const data = d.data();
-
-    let tick = "✔";
-    if(data.status==="delivered") tick="✔✔";
-    if(data.status==="read") tick="✔✔";
-
-    box.innerHTML += `
-      <div style="display:flex;flex-direction:column;
-      align-items:${data.sender===currentUser?"flex-end":"flex-start"};
-      margin:8px;">
-
-        <div style="
-          background:${data.sender===currentUser?"#25D366":"white"};
-          color:${data.sender===currentUser?"white":"black"};
-          padding:10px;
-          border-radius:12px;
-          max-width:70%;
-          word-wrap:break-word;
-        ">
-          ${data.text}
-        </div>
-
-        <div style="font-size:11px;color:gray;margin-top:2px;">
-          ${tick}
-        </div>
-
-      </div>
-    `;
-  });
-
-  box.scrollTop = box.scrollHeight;
-});
-
-// ================== CALL SYSTEM ==================
+// =======================
+// 📞 CALL SYSTEM
+// =======================
 
 let pc = new RTCPeerConnection({
   iceServers:[{urls:"stun:stun.l.google.com:19302"}]
 });
 
-let localStream;
+const callScreen = document.getElementById("callScreen");
 
-// CALL START
-document.getElementById("callBtn").addEventListener("click", async ()=>{
+function showCallUI(user){
+  callScreen.style.display="block";
+  document.getElementById("callUserName").innerText=user;
+}
 
-  localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+function goToChat(){
+  callScreen.style.display="none";
+}
 
-  localStream.getTracks().forEach(track=>{
-    pc.addTrack(track,localStream);
-  });
+function endCall(){
+  callScreen.style.display="none";
+  pc.close();
+}
 
-  // ICE SEND
-  pc.onicecandidate = async (event)=>{
-    if(event.candidate){
-      await setDoc(doc(db,"calls",selectedUser+"_ice"),{
-        candidate:event.candidate
-      });
-    }
-  };
+document.getElementById("callBtn").onclick = async ()=>{
+
+  showCallUI(selectedUser);
+
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+
+  stream.getTracks().forEach(track=>pc.addTrack(track,stream));
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
-  await setDoc(doc(db,"calls",selectedUser),{
+  await setDoc(doc(db,"calls",chatId),{
     offer:offer,
-    from:currentUser
+    from:currentUser,
+    to:selectedUser
   });
+};
 
-  alert("Calling...");
-});
-
-// RECEIVE
-onSnapshot(doc(db,"calls",currentUser), async (snap)=>{
-  const data = snap.data();
-
-  if(data?.offer){
-
-    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-
-    localStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    localStream.getTracks().forEach(track=>{
-      pc.addTrack(track,localStream);
-    });
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    await updateDoc(doc(db,"calls",currentUser),{
-      answer:answer
-    });
-
-    alert("Incoming call 🎤 Connected");
-  }
-
-  if(data?.answer){
-    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-  }
-});
-
-// ==================
-
-window.goBack=()=>window.location.href="dashboard.html";
+function goBack(){
+  window.location.href="dashboard.html";
+}
 
 </script>
 
