@@ -7,30 +7,49 @@
 
 <h2>Welcome, <span id="userDisplay"></span> 👋</h2>
 
+<!-- 🎤 MIC -->
 <button id="enableMicBtn">Enable Microphone 🎤</button>
 <p id="micStatus"></p>
 
 <hr>
 
+<!-- 🔎 SEARCH -->
 <h3>Search User</h3>
-<input id="searchInput" placeholder="Enter username"><br><br>
+<input id="searchInput" placeholder="Enter username">
 <button id="searchBtn">Search</button>
 
-<p id="result"></p>
+<ul id="userList"></ul>
 
-<button id="callBtn" style="display:none;">Call 📞</button>
+<hr>
 
-<!-- 📞 CALL SCREEN -->
-<div id="callScreen" style="display:none; border:2px solid black; padding:10px;">
-  <h3 id="callStatus">Incoming Call...</h3>
+<!-- 💬 CHAT THREAD -->
+<div id="chatSection" style="display:none;">
+  <h3 id="chatWith"></h3>
 
-  <button id="acceptBtn">Accept ✅</button>
-  <button id="rejectBtn">Reject ❌</button>
+  <div id="messages" style="border:1px solid black;height:200px;overflow:auto;"></div>
+
+  <input id="msgInput">
+  <button id="sendBtn">Send</button>
 
   <br><br>
 
-  <button id="muteBtn">Mute 🔇</button>
-  <button id="speakerBtn">Speaker 🔊</button>
+  <!-- 📞 CALL -->
+  <button id="callBtn">Call 📞</button>
+</div>
+
+<!-- 📞 POPUP -->
+<div id="callPopup" style="display:none;border:2px solid black;padding:10px;">
+  <h3 id="callStatus">Calling...</h3>
+
+  <button id="acceptBtn">Accept</button>
+  <button id="rejectBtn">Reject</button>
+
+  <br><br>
+
+  <button id="muteBtn">Mute</button>
+  <button id="speakerBtn">Speaker</button>
+  <button id="holdBtn">Hold</button>
+  <button id="endBtn">End</button>
 </div>
 
 <audio id="ringtone" loop src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg"></audio>
@@ -38,145 +57,169 @@
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot, updateDoc } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy,
+  setDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
+const app = initializeApp({
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
   projectId: "vishalchudega",
-};
-
-const app = initializeApp(firebaseConfig);
+});
 const db = getFirestore(app);
 
 const currentUser = localStorage.getItem("username");
 document.getElementById("userDisplay").innerText = currentUser;
 
 let selectedUser = "";
-let pc;
-let localStream;
+let chatId = "";
+let unsubscribe = null;
 let micAllowed = false;
 
-const ringtone = document.getElementById("ringtone");
-
 // 🎤 MIC
-document.getElementById("enableMicBtn").onclick = async () => {
+enableMicBtn.onclick = async () => {
   try {
-    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let s = await navigator.mediaDevices.getUserMedia({audio:true});
     micAllowed = true;
-    document.getElementById("micStatus").innerText = "Mic Allowed ✅";
-    s.getTracks().forEach(t => t.stop());
+    micStatus.innerText="Mic Allowed";
+    s.getTracks().forEach(t=>t.stop());
   } catch {
-    alert("Mic allow kar bhai");
+    alert("Mic allow karo");
   }
 };
 
-// 🔍 SEARCH
-document.getElementById("searchBtn").onclick = async () => {
-  selectedUser = document.getElementById("searchInput").value;
-  document.getElementById("callBtn").style.display = "block";
-  document.getElementById("result").innerText = "User Ready 📞";
+// 🔎 SEARCH
+searchBtn.onclick = async () => {
+  let u = searchInput.value;
+  let snap = await getDoc(doc(db,"users",u));
+
+  userList.innerHTML="";
+
+  if(snap.exists()){
+    let li = document.createElement("li");
+    li.innerText = u;
+    li.onclick = ()=>openChat(u);
+    userList.appendChild(li);
+  } else {
+    userList.innerText="User not found";
+  }
 };
 
-// 📞 CREATE PEER
-function createPeer() {
-  pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  });
+// 💬 OPEN CHAT THREAD
+function openChat(user){
+  selectedUser = user;
+  chatId = [currentUser, user].sort().join("_");
 
-  pc.onicecandidate = async (e) => {
-    if (e.candidate) {
-      await updateDoc(doc(db, "calls", selectedUser), {
-        candidate: JSON.stringify(e.candidate)
-      });
-    }
-  };
+  chatSection.style.display="block";
+  chatWith.innerText="Chat with "+user;
+
+  loadMessages();
 }
 
-// 📞 CALL
-document.getElementById("callBtn").onclick = async () => {
-  if (!micAllowed) return alert("Mic allow karo");
+// 💬 SEND
+sendBtn.onclick = async ()=>{
+  let msg = msgInput.value;
+  if(!msg) return;
 
-  createPeer();
-
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-
-  await setDoc(doc(db, "calls", selectedUser), {
-    offer,
-    from: currentUser
+  await addDoc(collection(db,"chats",chatId,"messages"),{
+    text:msg,
+    sender:currentUser,
+    time:Date.now()
   });
 
-  document.getElementById("callScreen").style.display = "block";
-  document.getElementById("callStatus").innerText = "Calling...";
+  msgInput.value="";
 };
 
-// 📞 RECEIVE
-onSnapshot(doc(db, "calls", currentUser), async (snap) => {
-  const data = snap.data();
+// 💬 LOAD (stable realtime)
+function loadMessages(){
+  if(unsubscribe) unsubscribe();
 
-  if (!data) return;
+  let q = query(
+    collection(db,"chats",chatId,"messages"),
+    orderBy("time")
+  );
 
-  if (data.offer) {
-    ringtone.play();
+  unsubscribe = onSnapshot(q,(snap)=>{
+    messages.innerHTML="";
+    snap.forEach(d=>{
+      let data = d.data();
+      messages.innerHTML += `<p><b>${data.sender}:</b> ${data.text}</p>`;
+    });
+  });
+}
 
-    document.getElementById("callScreen").style.display = "block";
-    document.getElementById("callStatus").innerText = "Incoming Call 📞";
+// ===================
+// 📞 CALL SYSTEM (UI + SIGNALING)
+// ===================
+
+callBtn.onclick = async ()=>{
+  if(!micAllowed) return alert("Mic allow kar");
+
+  callPopup.style.display="block";
+  callStatus.innerText="Calling...";
+
+  await setDoc(doc(db,"calls",selectedUser),{
+    from:currentUser,
+    type:"offer"
+  });
+};
+
+// 🔔 RECEIVE
+onSnapshot(doc(db,"calls",currentUser),(snap)=>{
+  let data = snap.data();
+  if(!data) return;
+
+  callPopup.style.display="block";
+
+  // अगर user chat open है → ringing
+  if(selectedUser === data.from){
+    callStatus.innerText="Ringing...";
+  } else {
+    callStatus.innerText="Incoming Call...";
   }
 
-  if (data.answer && pc) {
-    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-  }
-
-  if (data.candidate && pc) {
-    const c = new RTCIceCandidate(JSON.parse(data.candidate));
-    await pc.addIceCandidate(c);
-  }
+  ringtone.play();
 });
 
-// 📞 ACCEPT
-document.getElementById("acceptBtn").onclick = async () => {
+// ✅ ACCEPT
+acceptBtn.onclick = async ()=>{
   ringtone.pause();
 
-  createPeer();
+  callStatus.innerText="Connected 🎤";
 
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-  const callDoc = doc(db, "calls", currentUser);
-  const data = (await (await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js")).getDoc(callDoc)).data();
-
-  await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-
-  await updateDoc(callDoc, { answer });
-
-  document.getElementById("callStatus").innerText = "Connected 🎤";
+  await updateDoc(doc(db,"calls",selectedUser),{
+    type:"answer"
+  });
 };
 
 // ❌ REJECT
-document.getElementById("rejectBtn").onclick = () => {
+rejectBtn.onclick = ()=>{
   ringtone.pause();
-  document.getElementById("callScreen").style.display = "none";
+  callPopup.style.display="none";
 };
 
 // 🔇 MUTE
-document.getElementById("muteBtn").onclick = () => {
-  localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
+muteBtn.onclick = ()=>{
+  alert("Muted 🔇");
 };
 
-// 🔊 SPEAKER (basic toggle)
-document.getElementById("speakerBtn").onclick = () => {
-  alert("Speaker toggle depends on device 🔊");
+// 🔊 SPEAKER
+speakerBtn.onclick = ()=>{
+  alert("Speaker 🔊");
+};
+
+// ⏸ HOLD
+holdBtn.onclick = ()=>{
+  alert("On Hold ⏸");
+};
+
+// 📞 END
+endBtn.onclick = ()=>{
+  callPopup.style.display="none";
+  ringtone.pause();
 };
 
 </script>
-
 </body>
 </html>
