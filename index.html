@@ -14,13 +14,22 @@
 <button id="signupBtn">Sign Up</button>
 <button id="loginBtn">Login</button>
 
+<hr>
+
+<h3>Search User</h3>
+
+<input id="searchInput" placeholder="Enter username"><br><br>
+<button id="searchBtn">Search</button>
+
+<p id="result"></p>
+
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-import { getFirestore, setDoc, doc } 
+import { getFirestore, setDoc, doc, getDoc } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // CONFIG
@@ -79,6 +88,30 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     await signInWithEmailAndPassword(auth, emailVal, passVal);
 
     alert("Login success ✅");
+
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+// 🔍 SEARCH USER
+document.getElementById("searchBtn").addEventListener("click", async () => {
+  try {
+    const username = document.getElementById("searchInput").value;
+
+    if (!username) {
+      alert("Username daal pehle 😄");
+      return;
+    }
+
+    const userRef = doc(db, "users", username);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      document.getElementById("result").innerText = "User Found ✅";
+    } else {
+      document.getElementById("result").innerText = "User Not Found ❌";
+    }
 
   } catch (err) {
     alert(err.message);
