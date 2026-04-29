@@ -74,27 +74,34 @@ document.getElementById("signupBtn").addEventListener("click", async () => {
   }
 });
 
-// LOGIN
+// LOGIN + 🔥 DASHBOARD REDIRECT
 document.getElementById("loginBtn").addEventListener("click", async () => {
   try {
     const emailVal = document.getElementById("email").value;
     const passVal = document.getElementById("password").value;
+    const username = document.getElementById("username").value;
 
-    if (!emailVal || !passVal) {
-      alert("Email/password daal pehle 😄");
+    if (!emailVal || !passVal || !username) {
+      alert("Username + Email + Password daal 😄");
       return;
     }
 
     await signInWithEmailAndPassword(auth, emailVal, passVal);
 
+    // 🔥 username save karo
+    localStorage.setItem("username", username);
+
     alert("Login success ✅");
+
+    // 🔥 dashboard open karo
+    window.location.href = "dashboard.html";
 
   } catch (err) {
     alert(err.message);
   }
 });
 
-// 🔍 SEARCH USER
+// 🔍 SEARCH USER (testing ke liye yahi rehne diya)
 document.getElementById("searchBtn").addEventListener("click", async () => {
   try {
     const username = document.getElementById("searchInput").value;
