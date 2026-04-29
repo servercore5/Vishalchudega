@@ -1,65 +1,141 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Dashboard</title>
+  <title>Chats</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #0b0b0b;
+      color: white;
+    }
+
+    h2 {
+      padding: 15px;
+      margin: 0;
+      font-size: 28px;
+    }
+
+    #searchBox {
+      padding: 10px;
+    }
+
+    input {
+      width: 95%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #1f1f1f;
+      color: white;
+    }
+
+    #chatList {
+      margin-top: 10px;
+    }
+
+    .chatItem {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #222;
+      cursor: pointer;
+    }
+
+    .avatar {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background: #444;
+      margin-right: 10px;
+    }
+
+    .chatInfo {
+      flex: 1;
+    }
+
+    .chatName {
+      font-weight: bold;
+    }
+
+    .chatMsg {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .time {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    /* CHAT SCREEN */
+    #chatScreen {
+      display: none;
+      padding: 10px;
+    }
+
+    #messages {
+      height: 60vh;
+      overflow-y: auto;
+      background: #111;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .msg {
+      margin: 5px 0;
+    }
+
+    .me {
+      text-align: right;
+      color: #00ff9c;
+    }
+
+    .other {
+      text-align: left;
+    }
+
+    button {
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #00ff9c;
+      color: black;
+      margin-top: 5px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>Welcome, <span id="userDisplay"></span> 👋</h2>
+<h2>Chats</h2>
 
-<!-- 🎤 MIC -->
-<button id="enableMicBtn">Enable Microphone 🎤</button>
-<p id="micStatus"></p>
+<div id="searchBox">
+  <input id="searchInput" placeholder="Search username">
+</div>
 
-<hr>
+<div id="chatList"></div>
 
-<!-- 🔎 SEARCH -->
-<h3>Search User</h3>
-<input id="searchInput" placeholder="Enter username">
-<button id="searchBtn">Search</button>
-
-<ul id="userList"></ul>
-
-<hr>
-
-<!-- 💬 CHAT THREAD -->
-<div id="chatSection" style="display:none;">
+<!-- 💬 CHAT SCREEN -->
+<div id="chatScreen">
   <h3 id="chatWith"></h3>
 
-  <div id="messages" style="border:1px solid black;height:200px;overflow:auto;"></div>
+  <div id="messages"></div>
 
-  <input id="msgInput">
+  <input id="msgInput" placeholder="Type message">
   <button id="sendBtn">Send</button>
 
-  <br><br>
-
-  <!-- 📞 CALL -->
-  <button id="callBtn">Call 📞</button>
+  <br>
+  <button id="callBtn">📞 Call</button>
 </div>
-
-<!-- 📞 POPUP -->
-<div id="callPopup" style="display:none;border:2px solid black;padding:10px;">
-  <h3 id="callStatus">Calling...</h3>
-
-  <button id="acceptBtn">Accept</button>
-  <button id="rejectBtn">Reject</button>
-
-  <br><br>
-
-  <button id="muteBtn">Mute</button>
-  <button id="speakerBtn">Speaker</button>
-  <button id="holdBtn">Hold</button>
-  <button id="endBtn">End</button>
-</div>
-
-<audio id="ringtone" loop src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg"></audio>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
-  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy,
-  setDoc, updateDoc
+  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const app = initializeApp({
@@ -67,159 +143,102 @@ const app = initializeApp({
   authDomain: "vishalchudega.firebaseapp.com",
   projectId: "vishalchudega",
 });
+
 const db = getFirestore(app);
 
 const currentUser = localStorage.getItem("username");
-document.getElementById("userDisplay").innerText = currentUser;
 
 let selectedUser = "";
 let chatId = "";
-let unsubscribe = null;
-let micAllowed = false;
+let unsubscribe;
 
-// 🎤 MIC
-enableMicBtn.onclick = async () => {
-  try {
-    let s = await navigator.mediaDevices.getUserMedia({audio:true});
-    micAllowed = true;
-    micStatus.innerText="Mic Allowed";
-    s.getTracks().forEach(t=>t.stop());
-  } catch {
-    alert("Mic allow karo");
+// 🔎 SEARCH LIVE
+searchInput.oninput = async () => {
+  let username = searchInput.value;
+
+  if (!username) {
+    chatList.innerHTML = "";
+    return;
   }
-};
 
-// 🔎 SEARCH
-searchBtn.onclick = async () => {
-  let u = searchInput.value;
-  let snap = await getDoc(doc(db,"users",u));
+  let snap = await getDoc(doc(db, "users", username));
 
-  userList.innerHTML="";
+  chatList.innerHTML = "";
 
-  if(snap.exists()){
-    let li = document.createElement("li");
-    li.innerText = u;
-    li.onclick = ()=>openChat(u);
-    userList.appendChild(li);
+  if (snap.exists()) {
+    chatList.innerHTML = `
+      <div class="chatItem" onclick="openChat('${username}')">
+        <div class="avatar"></div>
+        <div class="chatInfo">
+          <div class="chatName">${username}</div>
+          <div class="chatMsg">Tap to chat</div>
+        </div>
+      </div>
+    `;
   } else {
-    userList.innerText="User not found";
+    chatList.innerHTML = "No user found";
   }
 };
 
-// 💬 OPEN CHAT THREAD
-function openChat(user){
+// 💬 OPEN CHAT
+window.openChat = (user) => {
+
   selectedUser = user;
   chatId = [currentUser, user].sort().join("_");
 
-  chatSection.style.display="block";
-  chatWith.innerText="Chat with "+user;
+  chatScreen.style.display = "block";
+  chatWith.innerText = "Chat with " + user;
 
   loadMessages();
-}
-
-// 💬 SEND
-sendBtn.onclick = async ()=>{
-  let msg = msgInput.value;
-  if(!msg) return;
-
-  await addDoc(collection(db,"chats",chatId,"messages"),{
-    text:msg,
-    sender:currentUser,
-    time:Date.now()
-  });
-
-  msgInput.value="";
 };
 
-// 💬 LOAD (stable realtime)
-function loadMessages(){
-  if(unsubscribe) unsubscribe();
+// 📤 SEND
+sendBtn.onclick = async () => {
+  let msg = msgInput.value;
+  if (!msg) return;
+
+  await addDoc(collection(db, "chats", chatId, "messages"), {
+    text: msg,
+    sender: currentUser,
+    time: Date.now()
+  });
+
+  msgInput.value = "";
+};
+
+// 📥 REALTIME CHAT
+function loadMessages() {
+
+  if (unsubscribe) unsubscribe();
 
   let q = query(
-    collection(db,"chats",chatId,"messages"),
+    collection(db, "chats", chatId, "messages"),
     orderBy("time")
   );
 
-  unsubscribe = onSnapshot(q,(snap)=>{
-    messages.innerHTML="";
-    snap.forEach(d=>{
-      let data = d.data();
-      messages.innerHTML += `<p><b>${data.sender}:</b> ${data.text}</p>`;
+  unsubscribe = onSnapshot(q, (snap) => {
+    messages.innerHTML = "";
+
+    snap.forEach(d => {
+      let m = d.data();
+
+      messages.innerHTML += `
+        <div class="msg ${m.sender === currentUser ? 'me' : 'other'}">
+          ${m.text}
+        </div>
+      `;
     });
+
+    messages.scrollTop = messages.scrollHeight;
   });
 }
 
-// ===================
-// 📞 CALL SYSTEM (UI + SIGNALING)
-// ===================
-
-callBtn.onclick = async ()=>{
-  if(!micAllowed) return alert("Mic allow kar");
-
-  callPopup.style.display="block";
-  callStatus.innerText="Calling...";
-
-  await setDoc(doc(db,"calls",selectedUser),{
-    from:currentUser,
-    type:"offer"
-  });
-};
-
-// 🔔 RECEIVE
-onSnapshot(doc(db,"calls",currentUser),(snap)=>{
-  let data = snap.data();
-  if(!data) return;
-
-  callPopup.style.display="block";
-
-  // अगर user chat open है → ringing
-  if(selectedUser === data.from){
-    callStatus.innerText="Ringing...";
-  } else {
-    callStatus.innerText="Incoming Call...";
-  }
-
-  ringtone.play();
-});
-
-// ✅ ACCEPT
-acceptBtn.onclick = async ()=>{
-  ringtone.pause();
-
-  callStatus.innerText="Connected 🎤";
-
-  await updateDoc(doc(db,"calls",selectedUser),{
-    type:"answer"
-  });
-};
-
-// ❌ REJECT
-rejectBtn.onclick = ()=>{
-  ringtone.pause();
-  callPopup.style.display="none";
-};
-
-// 🔇 MUTE
-muteBtn.onclick = ()=>{
-  alert("Muted 🔇");
-};
-
-// 🔊 SPEAKER
-speakerBtn.onclick = ()=>{
-  alert("Speaker 🔊");
-};
-
-// ⏸ HOLD
-holdBtn.onclick = ()=>{
-  alert("On Hold ⏸");
-};
-
-// 📞 END
-endBtn.onclick = ()=>{
-  callPopup.style.display="none";
-  ringtone.pause();
+// 📞 CALL BUTTON (UI only)
+callBtn.onclick = () => {
+  alert("Calling UI ready 📞 (next step = real call)");
 };
 
 </script>
+
 </body>
 </html>
