@@ -16,6 +16,10 @@
 <p id="result"></p>
 <button id="startChatBtn" style="display:none;">Start Chat</button>
 
+<!-- 🔥 CALL BUTTONS -->
+<button id="callBtn" style="display:none;">Call 📞</button>
+<button id="answerBtn" style="display:none;">Answer 📞</button>
+
 <div id="chatBox" style="display:none; margin-top:20px;">
   <h3>Chat</h3>
   <div id="messages" style="border:1px solid black; height:200px; overflow:auto;"></div><br>
@@ -26,8 +30,10 @@
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy,
+  setDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
@@ -45,6 +51,13 @@ document.getElementById("userDisplay").innerText = currentUser;
 let selectedUser = "";
 let chatId = "";
 
+// 🔥 CALL VARIABLES
+let pc = new RTCPeerConnection({
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+});
+let localStream;
+let remoteStream = new MediaStream();
+
 // 🔍 SEARCH
 document.getElementById("searchBtn").addEventListener("click", async () => {
   const username = document.getElementById("searchInput").value;
@@ -55,6 +68,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   if (userSnap.exists()) {
     document.getElementById("result").innerText = "User Found ✅";
     document.getElementById("startChatBtn").style.display = "block";
+    document.getElementById("callBtn").style.display = "block"; // 🔥 CALL SHOW
     selectedUser = username;
   } else {
     document.getElementById("result").innerText = "User Not Found ❌";
@@ -64,16 +78,13 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
 // 💬 START CHAT
 document.getElementById("startChatBtn").addEventListener("click", () => {
   document.getElementById("chatBox").style.display = "block";
-
   chatId = [currentUser, selectedUser].sort().join("_");
-
   loadMessages();
 });
 
 // 📤 SEND
 document.getElementById("sendBtn").addEventListener("click", async () => {
   const msg = document.getElementById("msgInput").value;
-
   if (!msg) return;
 
   await addDoc(collection(db, "chats", chatId, "messages"), {
@@ -104,6 +115,62 @@ function loadMessages() {
     box.scrollTop = box.scrollHeight;
   });
 }
+
+// ==========================
+// 📞 CALLING SYSTEM START
+// ==========================
+
+// CALL START
+document.getElementById("callBtn").addEventListener("click", async () => {
+
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  const callDoc = doc(db, "calls", currentUser);
+
+  await setDoc(callDoc, {
+    offer: offer,
+    to: selectedUser
+  });
+
+  alert("Calling... 📞");
+});
+
+// RECEIVE CALL
+const callDoc = doc(db, "calls", currentUser);
+
+onSnapshot(callDoc, async (snapshot) => {
+  const data = snapshot.data();
+
+  if (data?.offer) {
+    document.getElementById("answerBtn").style.display = "block";
+  }
+});
+
+// ANSWER CALL
+document.getElementById("answerBtn").addEventListener("click", async () => {
+
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+  const callData = (await getDoc(doc(db, "calls", currentUser))).data();
+
+  await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  await updateDoc(doc(db, "calls", currentUser), {
+    answer: answer
+  });
+
+  alert("Call Connected 🎤");
+});
 
 </script>
 
