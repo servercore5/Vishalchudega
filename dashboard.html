@@ -7,14 +7,14 @@
   <style>
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: Arial;
       background: #0b141a;
       color: white;
     }
 
     header {
       padding: 15px;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: bold;
     }
 
@@ -22,59 +22,34 @@
       padding: 10px;
     }
 
-    #searchInput {
-      width: 100%;
-      padding: 12px;
+    input {
+      width: 95%;
+      padding: 10px;
       border-radius: 10px;
       border: none;
       background: #202c33;
       color: white;
     }
 
-    .chatList {
-      margin-top: 5px;
-    }
-
     .chatItem {
       display: flex;
       padding: 12px;
-      align-items: center;
       border-bottom: 1px solid #222;
       cursor: pointer;
     }
 
-    .chatItem:hover {
-      background: #202c33;
-    }
-
     .avatar {
-      width: 50px;
-      height: 50px;
+      width: 45px;
+      height: 45px;
       border-radius: 50%;
       background: #555;
-      margin-right: 12px;
+      margin-right: 10px;
     }
 
-    .chatContent {
-      flex: 1;
-    }
-
-    .name {
-      font-size: 16px;
+    .chatName {
       font-weight: bold;
     }
 
-    .msg {
-      font-size: 13px;
-      color: #8696a0;
-    }
-
-    .time {
-      font-size: 12px;
-      color: #8696a0;
-    }
-
-    /* CHAT SCREEN */
     #chatScreen {
       display: none;
       position: fixed;
@@ -90,21 +65,19 @@
       background: #202c33;
       display: flex;
       justify-content: space-between;
-      align-items: center;
     }
 
     #messages {
-      height: 70%;
+      height: 65%;
       overflow-y: auto;
       padding: 10px;
     }
 
     .bubble {
       max-width: 70%;
-      padding: 8px 12px;
-      margin: 5px 0;
+      padding: 8px;
+      margin: 5px;
       border-radius: 10px;
-      font-size: 14px;
     }
 
     .me {
@@ -135,23 +108,14 @@
       color: white;
     }
 
-    #sendBtn {
-      margin-left: 10px;
+    button {
+      margin-left: 5px;
       padding: 10px;
       border: none;
       border-radius: 10px;
       background: #00a884;
       color: white;
     }
-
-    #callBtn {
-      background: #00a884;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 8px;
-      color: white;
-    }
-
   </style>
 </head>
 
@@ -165,54 +129,54 @@
 
 <div id="chatList"></div>
 
-<!-- CHAT SCREEN -->
+<!-- CHAT -->
 <div id="chatScreen">
-
   <div id="chatHeader">
     <span id="chatName"></span>
-    <button id="callBtn">📞</button>
+    <button onclick="closeChat()">❌</button>
   </div>
 
   <div id="messages"></div>
 
   <div id="inputArea">
-    <input id="msgInput" placeholder="Message">
-    <button id="sendBtn">➤</button>
+    <input id="msgInput" placeholder="Type message">
+    <button id="sendBtn">Send</button>
   </div>
-
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy
+  getFirestore, doc, getDoc, collection, addDoc,
+  onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
-  projectId: "vishalchudega",
+  projectId: "vishalchudega"
 });
 
 const db = getFirestore(app);
 
-const currentUser = localStorage.getItem("username");
+// ✅ IMPORTANT FIX
+const currentUser = localStorage.getItem("username")?.toLowerCase();
 
 let selectedUser = "";
 let chatId = "";
-let unsub;
+let unsub = null;
 
-// 🔍 SEARCH
+// 🔍 SEARCH USER
 searchInput.oninput = async () => {
-  let val = searchInput.value;
+  let val = searchInput.value.toLowerCase();
 
   if (!val) {
     chatList.innerHTML = "";
     return;
   }
 
-  let snap = await getDoc(doc(db, "users", val));
+  const snap = await getDoc(doc(db, "users", val));
 
   chatList.innerHTML = "";
 
@@ -220,31 +184,39 @@ searchInput.oninput = async () => {
     chatList.innerHTML = `
       <div class="chatItem" onclick="openChat('${val}')">
         <div class="avatar"></div>
-        <div class="chatContent">
-          <div class="name">${val}</div>
-          <div class="msg">Tap to chat</div>
-        </div>
-        <div class="time">now</div>
+        <div class="chatName">${val}</div>
       </div>
     `;
+  } else {
+    chatList.innerHTML = "User not found ❌";
   }
 };
 
-// OPEN CHAT
+// 💬 OPEN CHAT
 window.openChat = (user) => {
 
-  selectedUser = user;
-  chatId = [currentUser, user].sort().join("_");
+  selectedUser = user.toLowerCase();
+
+  // 🔥 FIXED CHAT ID (same for both users)
+  chatId = [currentUser, selectedUser].sort().join("_");
+
+  console.log("CHAT ID:", chatId);
 
   chatScreen.style.display = "block";
-  chatName.innerText = user;
+  chatName.innerText = selectedUser;
 
   loadMessages();
 };
 
-// SEND
+// ❌ CLOSE CHAT
+window.closeChat = () => {
+  chatScreen.style.display = "none";
+  if (unsub) unsub();
+};
+
+// 📤 SEND MESSAGE
 sendBtn.onclick = async () => {
-  let msg = msgInput.value;
+  const msg = msgInput.value.trim();
   if (!msg) return;
 
   await addDoc(collection(db, "chats", chatId, "messages"), {
@@ -256,21 +228,23 @@ sendBtn.onclick = async () => {
   msgInput.value = "";
 };
 
-// REALTIME CHAT
+// 📥 REALTIME RECEIVE
 function loadMessages() {
 
   if (unsub) unsub();
 
-  let q = query(
+  const q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("time")
   );
 
-  unsub = onSnapshot(q, snap => {
+  unsub = onSnapshot(q, (snap) => {
+    console.log("Messages:", snap.size);
+
     messages.innerHTML = "";
 
-    snap.forEach(d => {
-      let m = d.data();
+    snap.forEach(doc => {
+      const m = doc.data();
 
       messages.innerHTML += `
         <div class="bubble ${m.sender === currentUser ? 'me' : 'other'}">
@@ -282,11 +256,6 @@ function loadMessages() {
     messages.scrollTop = messages.scrollHeight;
   });
 }
-
-// CALL (placeholder)
-callBtn.onclick = () => {
-  alert("Call UI next step 🚀");
-};
 
 </script>
 
