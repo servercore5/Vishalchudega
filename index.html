@@ -1,129 +1,244 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Calling App</title>
+  <title>Encrypted Communication</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #cfe9ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 350px;
+      text-align: center;
+    }
+
+    img {
+      width: 80px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      color: black;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+      background: white;
+      color: black;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      font-weight: bold;
+    }
+
+    .link {
+      margin-top: 10px;
+      color: blue;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    /* Popup */
+    .popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .popup-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 350px;
+      animation: pop 0.3s ease;
+    }
+
+    @keyframes pop {
+      from { transform: scale(0.8); }
+      to { transform: scale(1); }
+    }
+
+    .eye {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+
+    .password-box {
+      position: relative;
+    }
+
+  </style>
 </head>
+
 <body>
 
-<h2>Login / Signup</h2>
+<div class="container">
 
-<input id="username" placeholder="Username"><br><br>
-<input id="email" placeholder="Email"><br><br>
-<input id="password" type="password" placeholder="Password"><br><br>
+  <img src="logopagal.png">
+  <h2>Encrypted Communication</h2>
 
-<button id="signupBtn">Sign Up</button>
-<button id="loginBtn">Login</button>
+  <input id="username" placeholder="Username">
+  
+  <div class="password-box">
+    <input id="password" type="password" placeholder="Password">
+    <span class="eye" onclick="togglePassword()">👁️</span>
+  </div>
 
-<hr>
+  <button id="loginBtn">Login</button>
 
-<h3>Search User</h3>
+  <div class="link">Forgot Password</div>
+  <div class="link" onclick="openPopup()">Sign Up</div>
 
-<input id="searchInput" placeholder="Enter username"><br><br>
-<button id="searchBtn">Search</button>
+</div>
 
-<p id="result"></p>
+<!-- SIGNUP POPUP -->
+<div class="popup" id="popup">
+
+  <div class="popup-content">
+
+    <h3>Create Account</h3>
+
+    <input id="name" placeholder="Name">
+    <input id="newUsername" placeholder="Username">
+    <input id="email" placeholder="Email">
+    <input id="newPassword" type="password" placeholder="Password">
+    <input id="confirmPassword" type="password" placeholder="Confirm Password">
+
+    <button onclick="signup()">Create Account</button>
+
+  </div>
+
+</div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-import { getFirestore, setDoc, doc, getDoc } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getFirestore, setDoc, doc 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
   authDomain: "vishalchudega.firebaseapp.com",
   projectId: "vishalchudega",
-  storageBucket: "vishalchudega.firebasestorage.app",
-  messagingSenderId: "783386455269",
-  appId: "1:783386455269:web:4b3ec213a3f4cb6972f80c"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// SIGNUP
-document.getElementById("signupBtn").addEventListener("click", async () => {
-  try {
-    const emailVal = document.getElementById("email").value;
-    const passVal = document.getElementById("password").value;
-    const username = document.getElementById("username").value;
-
-    if (!emailVal || !passVal || !username) {
-      alert("Saare fields bhar bhai 😄");
-      return;
-    }
-
-    const userCred = await createUserWithEmailAndPassword(auth, emailVal, passVal);
-
-    // Firestore save
-    await setDoc(doc(db, "users", username), {
-      email: emailVal,
-      uid: userCred.user.uid,
-      online: true
-    });
-
-    alert("Signup + Firestore save ✅");
-
-  } catch (err) {
-    alert(err.message);
-  }
-});
-
-// LOGIN + 🔥 DASHBOARD REDIRECT
+// 🔐 LOGIN
 document.getElementById("loginBtn").addEventListener("click", async () => {
+
+  const username = document.getElementById("username").value.toLowerCase();
+  const password = document.getElementById("password").value;
+
+  if (!username || !password) {
+    alert("Fill all fields");
+    return;
+  }
+
   try {
-    const emailVal = document.getElementById("email").value;
-    const passVal = document.getElementById("password").value;
-    const username = document.getElementById("username").value;
 
-    if (!emailVal || !passVal || !username) {
-      alert("Username + Email + Password daal 😄");
-      return;
-    }
+    // 🔥 username → email mapping
+    const email = username + "@app.com";
 
-    await signInWithEmailAndPassword(auth, emailVal, passVal);
+    await signInWithEmailAndPassword(auth, email, password);
 
-    // 🔥 username save karo
     localStorage.setItem("username", username);
 
-    alert("Login success ✅");
-
-    // 🔥 dashboard open karo
     window.location.href = "dashboard.html";
 
   } catch (err) {
-    alert(err.message);
+    alert("Invalid username or password ❌");
   }
 });
 
-// 🔍 SEARCH USER (testing ke liye yahi rehne diya)
-document.getElementById("searchBtn").addEventListener("click", async () => {
+// 📝 SIGNUP
+window.signup = async () => {
+
+  const name = document.getElementById("name").value;
+  const username = document.getElementById("newUsername").value.toLowerCase();
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("newPassword").value;
+  const confirm = document.getElementById("confirmPassword").value;
+
+  if (!name || !username || !email || !pass || !confirm) {
+    alert("All fields required");
+    return;
+  }
+
+  if (pass !== confirm) {
+    alert("Passwords do not match");
+    return;
+  }
+
   try {
-    const username = document.getElementById("searchInput").value;
 
-    if (!username) {
-      alert("Username daal pehle 😄");
-      return;
-    }
+    // 🔥 fake email for login mapping
+    const fakeEmail = username + "@app.com";
 
-    const userRef = doc(db, "users", username);
-    const userSnap = await getDoc(userRef);
+    const user = await createUserWithEmailAndPassword(auth, fakeEmail, pass);
 
-    if (userSnap.exists()) {
-      document.getElementById("result").innerText = "User Found ✅";
-    } else {
-      document.getElementById("result").innerText = "User Not Found ❌";
-    }
+    await setDoc(doc(db, "users", username), {
+      name,
+      email,
+      uid: user.user.uid
+    });
+
+    alert("Account created successfully ✅");
+
+    popup.style.display = "none";
 
   } catch (err) {
     alert(err.message);
   }
-});
+};
+
+// 👁️ PASSWORD TOGGLE
+window.togglePassword = () => {
+  const pass = document.getElementById("password");
+
+  pass.type = pass.type === "password" ? "text" : "password";
+};
+
+// POPUP
+window.openPopup = () => popup.style.display = "flex";
 
 </script>
 
