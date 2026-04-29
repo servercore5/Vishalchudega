@@ -56,7 +56,16 @@ let pc = new RTCPeerConnection({
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
 });
 let localStream;
-let remoteStream = new MediaStream();
+
+// 🔥 ICE FIX (IMPORTANT)
+pc.onicecandidate = async (event) => {
+  if (event.candidate) {
+    await setDoc(doc(db, "calls", selectedUser), {
+      candidate: JSON.stringify(event.candidate),
+      from: currentUser
+    }, { merge: true });
+  }
+};
 
 // 🔍 SEARCH
 document.getElementById("searchBtn").addEventListener("click", async () => {
@@ -68,7 +77,7 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   if (userSnap.exists()) {
     document.getElementById("result").innerText = "User Found ✅";
     document.getElementById("startChatBtn").style.display = "block";
-    document.getElementById("callBtn").style.display = "block"; // 🔥 CALL SHOW
+    document.getElementById("callBtn").style.display = "block";
     selectedUser = username;
   } else {
     document.getElementById("result").innerText = "User Not Found ❌";
@@ -117,59 +126,68 @@ function loadMessages() {
 }
 
 // ==========================
-// 📞 CALLING SYSTEM START
+// 📞 CALL START (FIXED)
 // ==========================
-
-// CALL START
 document.getElementById("callBtn").addEventListener("click", async () => {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+    // 🔥 IMPORTANT: send to OTHER USER
+    await setDoc(doc(db, "calls", selectedUser), {
+      offer: offer,
+      from: currentUser
+    });
 
-  const callDoc = doc(db, "calls", currentUser);
+    alert("Calling... 📞");
 
-  await setDoc(callDoc, {
-    offer: offer,
-    to: selectedUser
-  });
-
-  alert("Calling... 📞");
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
-// RECEIVE CALL
-const callDoc = doc(db, "calls", currentUser);
-
-onSnapshot(callDoc, async (snapshot) => {
+// ==========================
+// 📞 RECEIVE CALL
+// ==========================
+onSnapshot(doc(db, "calls", currentUser), async (snapshot) => {
   const data = snapshot.data();
 
   if (data?.offer) {
     document.getElementById("answerBtn").style.display = "block";
+
+    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+  }
+
+  if (data?.answer) {
+    await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
   }
 });
 
-// ANSWER CALL
+// ==========================
+// 📞 ANSWER CALL
+// ==========================
 document.getElementById("answerBtn").addEventListener("click", async () => {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
 
-  const callData = (await getDoc(doc(db, "calls", currentUser))).data();
+    await updateDoc(doc(db, "calls", currentUser), {
+      answer: answer
+    });
 
-  await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+    alert("Call Connected 🎤");
 
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-
-  await updateDoc(doc(db, "calls", currentUser), {
-    answer: answer
-  });
-
-  alert("Call Connected 🎤");
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 </script>
