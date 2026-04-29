@@ -1,142 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chats</title>
+  <title>Chat</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: -apple-system, sans-serif;
       background: #0b141a;
       color: white;
     }
 
-    header {
-      padding: 15px;
-      font-size: 22px;
-      font-weight: bold;
+    /* HEADER */
+    #header {
+      display: flex;
+      align-items: center;
+      padding: 10px;
       background: #202c33;
     }
 
-    .tabs {
-      display: flex;
-      justify-content: space-around;
-      padding: 10px;
-      background: #202c33;
-      font-size: 14px;
+    #header img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      margin: 0 10px;
+    }
+
+    #name {
+      font-weight: bold;
+    }
+
+    #status {
+      font-size: 12px;
       color: #aaa;
     }
 
-    .active {
-      color: #25D366;
-      border-bottom: 2px solid #25D366;
+    #header-icons {
+      margin-left: auto;
     }
 
-    #searchBox {
-      padding: 10px;
-      background: #202c33;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      background: #2a3942;
-      color: white;
-    }
-
-    .chatItem {
-      display: flex;
-      padding: 12px;
-      border-bottom: 1px solid #222;
-      align-items: center;
+    #header-icons span {
+      margin: 0 5px;
       cursor: pointer;
     }
 
-    .chatItem:hover {
-      background: #202c33;
-    }
-
-    .avatar {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: #555;
-      margin-right: 10px;
-      position: relative;
-    }
-
-    .online {
-      width: 10px;
-      height: 10px;
-      background: #25D366;
-      border-radius: 50%;
-      position: absolute;
-      bottom: 3px;
-      right: 3px;
-    }
-
-    .chatContent {
-      flex: 1;
-    }
-
-    .name {
-      font-weight: bold;
-    }
-
-    .msg {
-      font-size: 13px;
-      color: #aaa;
-    }
-
-    .right {
-      text-align: right;
-      font-size: 12px;
-      color: #aaa;
-    }
-
-    .badge {
-      background: #25D366;
-      color: black;
-      padding: 3px 6px;
-      border-radius: 10px;
-      font-size: 12px;
-      margin-top: 3px;
-      display: inline-block;
-    }
-
-    /* CHAT SCREEN */
-    #chatScreen {
-      display: none;
-      position: fixed;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background: #0b141a;
-    }
-
-    #chatHeader {
-      background: #202c33;
-      padding: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
+    /* CHAT AREA */
     #messages {
-      height: 70%;
+      height: 70vh;
       overflow-y: auto;
       padding: 10px;
+      background: url('https://i.imgur.com/3e7Jb8k.png');
+      background-size: cover;
     }
 
     .bubble {
       max-width: 70%;
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-radius: 10px;
-      margin: 5px 0;
+      margin: 5px;
       font-size: 14px;
+      position: relative;
     }
 
     .me {
@@ -149,78 +73,147 @@
       margin-right: auto;
     }
 
+    .time {
+      font-size: 10px;
+      color: #ccc;
+      margin-top: 3px;
+      text-align: right;
+    }
+
+    .ticks {
+      font-size: 10px;
+      color: #34b7f1;
+    }
+
+    /* INPUT */
     #inputArea {
-      position: absolute;
-      bottom: 0;
-      width: 100%;
+      display: flex;
       padding: 10px;
       background: #202c33;
-      display: flex;
     }
 
     #msgInput {
       flex: 1;
       padding: 10px;
-      border-radius: 10px;
+      border-radius: 20px;
       border: none;
       background: #2a3942;
       color: white;
     }
 
     button {
-      margin-left: 5px;
-      padding: 10px;
+      background: none;
       border: none;
-      border-radius: 10px;
-      background: #25D366;
-      color: black;
+      color: #25D366;
+      font-size: 18px;
+      margin: 0 5px;
     }
+
+    /* ATTACHMENT MENU */
+    #attachMenu {
+      display: none;
+      position: absolute;
+      bottom: 70px;
+      left: 10px;
+      background: #202c33;
+      padding: 10px;
+      border-radius: 10px;
+      width: 250px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .grid div {
+      padding: 10px;
+    }
+
+    /* MENU */
+    #menu {
+      display: none;
+      position: absolute;
+      top: 50px;
+      right: 10px;
+      background: #202c33;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    #menu div {
+      padding: 5px;
+    }
+
   </style>
 </head>
 
 <body>
 
-<header>WhatsApp</header>
-
-<div class="tabs">
-  <div class="active">Chats</div>
-  <div>Status</div>
-  <div>Calls</div>
-</div>
-
-<div id="searchBox">
-  <input id="searchInput" placeholder="Search">
-</div>
-
-<div id="chatList"></div>
-
-<!-- CHAT SCREEN -->
-<div id="chatScreen">
-
-  <div id="chatHeader">
-    <span id="chatName"></span>
-    <button onclick="closeChat()">❌</button>
+<!-- HEADER -->
+<div id="header">
+  ←
+  <img src="https://randomuser.me/api/portraits/women/44.jpg">
+  <div>
+    <div id="name">Priya Sharma</div>
+    <div id="status">online</div>
   </div>
 
-  <div id="messages"></div>
-
-  <div id="inputArea">
-    <input id="msgInput" placeholder="Type a message">
-    <button id="sendBtn">➤</button>
+  <div id="header-icons">
+    📹 📞 <span onclick="toggleMenu()">⋮</span>
   </div>
+</div>
 
+<!-- MENU -->
+<div id="menu">
+  <div>View contact</div>
+  <div>Search</div>
+  <div>Mute</div>
+  <div>Clear chat</div>
+  <div>Block</div>
+</div>
+
+<!-- CHAT -->
+<div id="messages"></div>
+
+<!-- ATTACH -->
+<div id="attachMenu">
+  <div class="grid">
+    <div>📄 Document</div>
+    <div>📷 Camera</div>
+    <div>🖼 Gallery</div>
+    <div>🎵 Audio</div>
+    <div>📍 Location</div>
+    <div>👤 Contact</div>
+    <div>📊 Poll</div>
+    <div>😊 Sticker</div>
+  </div>
+</div>
+
+<!-- INPUT -->
+<div id="inputArea">
+  😊
+  <button onclick="toggleAttach()">📎</button>
+  📷
+
+  <input id="msgInput" placeholder="Type a message">
+
+  <button id="sendBtn">➤</button>
+  🎤
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, collection, addDoc,
-  onSnapshot, query, orderBy
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const app = initializeApp({
-  apiKey: "AIzaSyCY79w4aFGPxndBqLf2-TEvJ-bKjBLYY_c",
+  apiKey: "AIzaSy...",
   authDomain: "vishalchudega.firebaseapp.com",
   projectId: "vishalchudega"
 });
@@ -228,98 +221,56 @@ const app = initializeApp({
 const db = getFirestore(app);
 
 const currentUser = localStorage.getItem("username")?.toLowerCase();
+const selectedUser = "testuser"; // demo
+const chatId = [currentUser, selectedUser].sort().join("_");
 
-let selectedUser = "";
-let chatId = "";
-let unsub;
+// SEND
+sendBtn.onclick = async () => {
+  const msg = msgInput.value;
+  if (!msg) return;
 
-// 🔍 SEARCH
-searchInput.oninput = async () => {
-  let val = searchInput.value.toLowerCase();
+  await addDoc(collection(db,"chats",chatId,"messages"),{
+    text:msg,
+    sender:currentUser,
+    time:Date.now()
+  });
 
-  if (!val) {
-    chatList.innerHTML = "";
-    return;
-  }
+  msgInput.value="";
+};
 
-  const snap = await getDoc(doc(db, "users", val));
+// RECEIVE
+const q = query(
+  collection(db,"chats",chatId,"messages"),
+  orderBy("time")
+);
 
-  chatList.innerHTML = "";
+onSnapshot(q,snap=>{
+  messages.innerHTML="";
 
-  if (snap.exists()) {
-    chatList.innerHTML = `
-      <div class="chatItem" onclick="openChat('${val}')">
-        <div class="avatar"><div class="online"></div></div>
-        <div class="chatContent">
-          <div class="name">${val}</div>
-          <div class="msg">Tap to chat</div>
-        </div>
-        <div class="right">
-          now<br><span class="badge">1</span>
+  snap.forEach(d=>{
+    let m=d.data();
+
+    messages.innerHTML+=`
+      <div class="bubble ${m.sender===currentUser?'me':'other'}">
+        ${m.text}
+        <div class="time">
+          11:35 ✔✔
         </div>
       </div>
     `;
-  }
-};
-
-// 💬 OPEN CHAT
-window.openChat = (user) => {
-
-  selectedUser = user.toLowerCase();
-  chatId = [currentUser, selectedUser].sort().join("_");
-
-  chatScreen.style.display = "block";
-  chatName.innerText = user;
-
-  loadMessages();
-};
-
-// ❌ CLOSE
-window.closeChat = () => {
-  chatScreen.style.display = "none";
-  if (unsub) unsub();
-};
-
-// 📤 SEND
-sendBtn.onclick = async () => {
-  let msg = msgInput.value;
-  if (!msg) return;
-
-  await addDoc(collection(db, "chats", chatId, "messages"), {
-    text: msg,
-    sender: currentUser,
-    time: Date.now()
   });
 
-  msgInput.value = "";
+  messages.scrollTop=messages.scrollHeight;
+});
+
+// UI
+window.toggleAttach=()=>{
+  attachMenu.style.display = attachMenu.style.display==="block"?"none":"block";
 };
 
-// 📥 REALTIME
-function loadMessages() {
-
-  if (unsub) unsub();
-
-  let q = query(
-    collection(db, "chats", chatId, "messages"),
-    orderBy("time")
-  );
-
-  unsub = onSnapshot(q, snap => {
-    messages.innerHTML = "";
-
-    snap.forEach(d => {
-      let m = d.data();
-
-      messages.innerHTML += `
-        <div class="bubble ${m.sender === currentUser ? 'me' : 'other'}">
-          ${m.text}
-        </div>
-      `;
-    });
-
-    messages.scrollTop = messages.scrollHeight;
-  });
-}
+window.toggleMenu=()=>{
+  menu.style.display = menu.style.display==="block"?"none":"block";
+};
 
 </script>
 
