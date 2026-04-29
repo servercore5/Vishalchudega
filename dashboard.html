@@ -2,115 +2,162 @@
 <html>
 <head>
   <title>Chats</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
     body {
       margin: 0;
-      font-family: Arial;
-      background: #0b0b0b;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b141a;
       color: white;
     }
 
-    h2 {
+    header {
       padding: 15px;
-      margin: 0;
-      font-size: 28px;
+      font-size: 26px;
+      font-weight: bold;
     }
 
     #searchBox {
       padding: 10px;
     }
 
-    input {
-      width: 95%;
-      padding: 10px;
+    #searchInput {
+      width: 100%;
+      padding: 12px;
       border-radius: 10px;
       border: none;
-      background: #1f1f1f;
+      background: #202c33;
       color: white;
     }
 
-    #chatList {
-      margin-top: 10px;
+    .chatList {
+      margin-top: 5px;
     }
 
     .chatItem {
       display: flex;
-      align-items: center;
       padding: 12px;
+      align-items: center;
       border-bottom: 1px solid #222;
       cursor: pointer;
     }
 
-    .avatar {
-      width: 45px;
-      height: 45px;
-      border-radius: 50%;
-      background: #444;
-      margin-right: 10px;
+    .chatItem:hover {
+      background: #202c33;
     }
 
-    .chatInfo {
+    .avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #555;
+      margin-right: 12px;
+    }
+
+    .chatContent {
       flex: 1;
     }
 
-    .chatName {
+    .name {
+      font-size: 16px;
       font-weight: bold;
     }
 
-    .chatMsg {
+    .msg {
       font-size: 13px;
-      color: #aaa;
+      color: #8696a0;
     }
 
     .time {
       font-size: 12px;
-      color: #aaa;
+      color: #8696a0;
     }
 
     /* CHAT SCREEN */
     #chatScreen {
       display: none;
-      padding: 10px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b141a;
+    }
+
+    #chatHeader {
+      padding: 15px;
+      background: #202c33;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     #messages {
-      height: 60vh;
+      height: 70%;
       overflow-y: auto;
-      background: #111;
       padding: 10px;
-      border-radius: 10px;
     }
 
-    .msg {
+    .bubble {
+      max-width: 70%;
+      padding: 8px 12px;
       margin: 5px 0;
+      border-radius: 10px;
+      font-size: 14px;
     }
 
     .me {
-      text-align: right;
-      color: #00ff9c;
+      background: #005c4b;
+      margin-left: auto;
     }
 
     .other {
-      text-align: left;
+      background: #202c33;
+      margin-right: auto;
     }
 
-    button {
+    #inputArea {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      padding: 10px;
+      background: #202c33;
+      display: flex;
+    }
+
+    #msgInput {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #2a3942;
+      color: white;
+    }
+
+    #sendBtn {
+      margin-left: 10px;
       padding: 10px;
       border: none;
       border-radius: 10px;
-      background: #00ff9c;
-      color: black;
-      margin-top: 5px;
+      background: #00a884;
+      color: white;
     }
+
+    #callBtn {
+      background: #00a884;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: white;
+    }
+
   </style>
 </head>
 
 <body>
 
-<h2>Chats</h2>
+<header>Chats</header>
 
 <div id="searchBox">
   <input id="searchInput" placeholder="Search username">
@@ -118,23 +165,27 @@
 
 <div id="chatList"></div>
 
-<!-- 💬 CHAT SCREEN -->
+<!-- CHAT SCREEN -->
 <div id="chatScreen">
-  <h3 id="chatWith"></h3>
+
+  <div id="chatHeader">
+    <span id="chatName"></span>
+    <button id="callBtn">📞</button>
+  </div>
 
   <div id="messages"></div>
 
-  <input id="msgInput" placeholder="Type message">
-  <button id="sendBtn">Send</button>
+  <div id="inputArea">
+    <input id="msgInput" placeholder="Message">
+    <button id="sendBtn">➤</button>
+  </div>
 
-  <br>
-  <button id="callBtn">📞 Call</button>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
+import {
   getFirestore, doc, getDoc, collection, addDoc, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -150,49 +201,48 @@ const currentUser = localStorage.getItem("username");
 
 let selectedUser = "";
 let chatId = "";
-let unsubscribe;
+let unsub;
 
-// 🔎 SEARCH LIVE
+// 🔍 SEARCH
 searchInput.oninput = async () => {
-  let username = searchInput.value;
+  let val = searchInput.value;
 
-  if (!username) {
+  if (!val) {
     chatList.innerHTML = "";
     return;
   }
 
-  let snap = await getDoc(doc(db, "users", username));
+  let snap = await getDoc(doc(db, "users", val));
 
   chatList.innerHTML = "";
 
   if (snap.exists()) {
     chatList.innerHTML = `
-      <div class="chatItem" onclick="openChat('${username}')">
+      <div class="chatItem" onclick="openChat('${val}')">
         <div class="avatar"></div>
-        <div class="chatInfo">
-          <div class="chatName">${username}</div>
-          <div class="chatMsg">Tap to chat</div>
+        <div class="chatContent">
+          <div class="name">${val}</div>
+          <div class="msg">Tap to chat</div>
         </div>
+        <div class="time">now</div>
       </div>
     `;
-  } else {
-    chatList.innerHTML = "No user found";
   }
 };
 
-// 💬 OPEN CHAT
+// OPEN CHAT
 window.openChat = (user) => {
 
   selectedUser = user;
   chatId = [currentUser, user].sort().join("_");
 
   chatScreen.style.display = "block";
-  chatWith.innerText = "Chat with " + user;
+  chatName.innerText = user;
 
   loadMessages();
 };
 
-// 📤 SEND
+// SEND
 sendBtn.onclick = async () => {
   let msg = msgInput.value;
   if (!msg) return;
@@ -206,24 +256,24 @@ sendBtn.onclick = async () => {
   msgInput.value = "";
 };
 
-// 📥 REALTIME CHAT
+// REALTIME CHAT
 function loadMessages() {
 
-  if (unsubscribe) unsubscribe();
+  if (unsub) unsub();
 
   let q = query(
     collection(db, "chats", chatId, "messages"),
     orderBy("time")
   );
 
-  unsubscribe = onSnapshot(q, (snap) => {
+  unsub = onSnapshot(q, snap => {
     messages.innerHTML = "";
 
     snap.forEach(d => {
       let m = d.data();
 
       messages.innerHTML += `
-        <div class="msg ${m.sender === currentUser ? 'me' : 'other'}">
+        <div class="bubble ${m.sender === currentUser ? 'me' : 'other'}">
           ${m.text}
         </div>
       `;
@@ -233,9 +283,9 @@ function loadMessages() {
   });
 }
 
-// 📞 CALL BUTTON (UI only)
+// CALL (placeholder)
 callBtn.onclick = () => {
-  alert("Calling UI ready 📞 (next step = real call)");
+  alert("Call UI next step 🚀");
 };
 
 </script>
