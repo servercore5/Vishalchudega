@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    body{
-      margin:0;
-      font-family:sans-serif;
-      background:#cfe3f3;
-    }
+    body{margin:0;font-family:sans-serif;background:#cfe3f3;}
 
     .header{
       background:white;
@@ -34,38 +30,28 @@
       word-wrap:break-word;
     }
 
-    .sent{
-      background:#25D366;
-      color:white;
-      margin-left:auto;
-    }
-
-    .received{
-      background:white;
-      margin-right:auto;
-    }
+    .sent{background:#25D366;color:white;margin-left:auto;}
+    .received{background:white;margin-right:auto;}
 
     .time{
       font-size:10px;
-      text-align:right;
       display:block;
+      text-align:right;
       margin-top:5px;
     }
 
-    /* INPUT */
     .inputBox{
       position:fixed;
       bottom:0;
       width:100%;
       display:flex;
-      align-items:center;
+      gap:8px;
       background:white;
       padding:8px;
-      gap:8px;
     }
 
     .inputBox input{
-      flex:0.8; /* 🔥 width kam */
+      flex:0.8;
       padding:10px;
       border-radius:20px;
       border:1px solid gray;
@@ -80,7 +66,6 @@
       border-radius:20px;
     }
 
-    /* CALL SCREEN */
     #callScreen{
       display:none;
       position:fixed;
@@ -106,14 +91,9 @@
       padding:15px;
       border-radius:50%;
       border:none;
-      font-size:18px;
     }
 
-    .end{
-      background:red;
-      color:white;
-    }
-
+    .end{background:red;color:white;}
   </style>
 </head>
 
@@ -134,7 +114,6 @@
 
 <!-- CALL UI -->
 <div id="callScreen">
-
   <button onclick="goToChat()" style="position:absolute;top:10px;left:10px;background:none;color:white;border:none;">
     ⬅ Go to Chats
   </button>
@@ -147,20 +126,19 @@
   </div>
 
   <div class="callControls">
-    <button id="moreBtn">⋯</button>
-    <button id="videoBtn">📹</button>
     <button id="speakerBtn">🔊</button>
     <button id="muteBtn">🎤</button>
     <button class="end" onclick="endCall()">📞</button>
   </div>
-
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy,
+  doc, setDoc, updateDoc 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSy...",
@@ -179,12 +157,12 @@ document.getElementById("chatUser").innerText = selectedUser;
 const chatId = [currentUser, selectedUser].sort().join("_");
 
 
-// 🔥 MESSAGE LOAD
-onSnapshot(query(collection(db,"chats",chatId,"messages"), orderBy("time")), snapshot=>{
+// 🔥 CHAT LOAD
+onSnapshot(query(collection(db,"chats",chatId,"messages"), orderBy("time")), snap=>{
   const box = document.getElementById("messages");
   box.innerHTML="";
 
-  snapshot.forEach(doc=>{
+  snap.forEach(doc=>{
     const d = doc.data();
 
     const div = document.createElement("div");
@@ -218,7 +196,7 @@ document.getElementById("sendBtn").onclick = async ()=>{
 
 
 // ==================
-// CALL SYSTEM
+// CALL SYSTEM FIXED
 // ==================
 
 let pc = new RTCPeerConnection({
@@ -226,7 +204,16 @@ let pc = new RTCPeerConnection({
 });
 
 let localStream;
-let isMuted=false;
+let remoteAudio = document.createElement("audio");
+remoteAudio.autoplay = true;
+
+pc.ontrack = (e)=>{
+  remoteAudio.srcObject = e.streams[0];
+};
+
+let callDocRef;
+let localCandidates;
+let remoteCandidates;
 
 const callScreen = document.getElementById("callScreen");
 
@@ -248,46 +235,107 @@ function endCall(){
 }
 
 
-// CALL
+// CALL START
 document.getElementById("callBtn").onclick = async ()=>{
+
   showCallUI(selectedUser);
 
   localStream = await navigator.mediaDevices.getUserMedia({audio:true});
 
   localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
 
+  callDocRef = doc(db,"calls",chatId);
+
+  localCandidates = collection(callDocRef,"offerCandidates");
+  remoteCandidates = collection(callDocRef,"answerCandidates");
+
+  pc.onicecandidate = async (e)=>{
+    if(e.candidate){
+      await addDoc(localCandidates, e.candidate.toJSON());
+    }
+  };
+
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
-  await setDoc(doc(db,"calls",chatId),{
+  await setDoc(callDocRef,{
     offer:offer,
     from:currentUser,
     to:selectedUser
   });
-};
 
-
-// 🔇 MUTE
-document.getElementById("muteBtn").onclick = ()=>{
-  if(!localStream) return;
-
-  isMuted=!isMuted;
-
-  localStream.getAudioTracks().forEach(t=>{
-    t.enabled=!isMuted;
+  onSnapshot(callDocRef, async snap=>{
+    const data = snap.data();
+    if(data?.answer && !pc.currentRemoteDescription){
+      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      document.getElementById("callStatus").innerText="Connected 🎤";
+    }
   });
 
-  document.getElementById("muteBtn").innerText = isMuted ? "🔇":"🎤";
+  onSnapshot(remoteCandidates, snap=>{
+    snap.docChanges().forEach(c=>{
+      if(c.type==="added"){
+        pc.addIceCandidate(new RTCIceCandidate(c.doc.data()));
+      }
+    });
+  });
 };
 
 
-// 🔊 SPEAKER
-document.getElementById("speakerBtn").onclick = ()=>{
-  alert("Speaker toggle (browser limited)");
+// RECEIVE CALL
+onSnapshot(doc(db,"calls",chatId), async snap=>{
+  const data = snap.data();
+
+  if(data?.offer && data.to === currentUser){
+
+    showCallUI(data.from);
+    document.getElementById("callStatus").innerText="Incoming...";
+
+    localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+
+    localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+
+    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    localCandidates = collection(doc(db,"calls",chatId),"answerCandidates");
+    remoteCandidates = collection(doc(db,"calls",chatId),"offerCandidates");
+
+    await updateDoc(doc(db,"calls",chatId),{answer:answer});
+
+    onSnapshot(remoteCandidates, snap=>{
+      snap.docChanges().forEach(c=>{
+        if(c.type==="added"){
+          pc.addIceCandidate(new RTCIceCandidate(c.doc.data()));
+        }
+      });
+    });
+
+    document.getElementById("callStatus").innerText="Connected 🎤";
+  }
+});
+
+
+// MUTE
+let isMuted=false;
+document.getElementById("muteBtn").onclick=()=>{
+  if(!localStream) return;
+  isMuted=!isMuted;
+
+  localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
+
+  document.getElementById("muteBtn").innerText=isMuted?"🔇":"🎤";
 };
 
 
-// BACK
+// SPEAKER (UI only)
+document.getElementById("speakerBtn").onclick=()=>{
+  alert("Speaker toggle (browser limitation)");
+};
+
+
 function goBack(){
   window.location.href="dashboard.html";
 }
